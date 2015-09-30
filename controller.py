@@ -33,6 +33,11 @@ class Squid():
         self.pos = Position(y, x)
         self.remaining_time = remaining_time
 
+class Carlo():
+    def random_set(self, start, last_turn):
+        for i in xrange(last_turn):
+
+
 class Battle():
     def __init__(self, enemy_num):
         self.enemy_num = enemy_num
@@ -65,6 +70,7 @@ class Battle():
                     next = Position(y, x)
                     break
                 elif not self.visit_board[y][x]:
+
                     next = Position(y, x)
                 # elif not next:
                 #     next = Position(y, x)
