@@ -1,6 +1,5 @@
 
 #include <iostream>
-#include <string.h>
 
 using namespace std;
 
@@ -8,12 +7,13 @@ using namespace std;
 #define AREP(i,a) for (int i=0;i<sizeof(a)/sizeof(a[0]);i++)
 
 ///////////////////////// base //////////////////////////////
-
+namespace game {
 const int X = 35;
 const int Y = 20;
 const int SQUID_NUM_MAX = 4;
 const int TURN_MAX = 350;
 const int ME = 0;
+}
 
 namespace Cell {
 const char NEURAL = '.';
@@ -48,37 +48,64 @@ public:
 template <typename T>
 struct Board {
 private:
-    T _board[Y * X] = {};
+    T _board[game::Y * game::X] = {};
 public:
     T operator[](Pos pos) const {
-        return _board[pos.y * X + pos.x];
+        return _board[pos.y * game::X + pos.x];
     }
     
     T &operator[](Pos pos) {
-        return _board[pos.y * X + pos.x];
+        return _board[pos.y * game::X + pos.x];
     }
     
     void dump() {
-        REP(y, Y) {
-            REP(x, X) {
-                cerr << _board[y * X + x];
+        REP(y, game::Y) {
+            REP(x, game::X) {
+                cerr << _board[y * game::X + x];
             } cerr << endl;
         }
     }
-
+    
 };
 
 ////////////////////// controller ///////////////////////////
 
-namespace Controller {
-void printNext(Pos &next) {
-    cout << next.x << " " << next.y << endl;
+namespace controller {
+    void printNext(Pos &next) {
+        cout << next.x << " " << next.y << endl;
+    }
 }
+
+
+namespace util {
+const Pos unitVectors[4] = {
+    Pos(1, 0),
+    Pos(-1, 0),
+    Pos(0, 1),
+    Pos(0, -1),
+};
 }
 
 ////////////////////// simulator  ///////////////////////////
 namespace simulator {
+    void nextTurn(Board<char> *board, Pos *nextPositions) {
+    // 重なってた場合は塗らない
+    }
 
+}
+
+
+void paint(Board<char> *board, char color, Pos pos) {
+    int paintCount = 0;
+    REP(i, game::SQUID_NUM_MAX) {
+        if ((*board)[util::unitVectors[i]]) {
+            paintCount++;
+        }
+    }
+    
+    if (paintCount < 2) {
+        return;
+    }
     
 }
 
@@ -91,28 +118,23 @@ public:
     int enemyNum = 0;
     Board<char> board;
     Board<bool> visited;
-    Squid squids[SQUID_NUM_MAX];
-    const Pos unitVectors[4] = {
-        Pos(1, 0),
-        Pos(-1, 0),
-        Pos(0, 1),
-        Pos(0, -1),
-    };
+    Squid squids[game::SQUID_NUM_MAX];
+
     
     void updateSquid(int index, int x, int y, int remainingTime) {
         squids[index].update(x, y, remainingTime);
     }
     
     void turn() {
-        Pos myPos = squids[ME].pos;
+        Pos myPos = squids[game::ME].pos;
         visited[myPos] = true;
         
         Pos next = Pos(0, 0);
-        AREP(i, unitVectors) {
-            int x = myPos.x + unitVectors[i].x;
-            int y = myPos.y + unitVectors[i].y;
+        AREP(i, util::unitVectors) {
+            int x = myPos.x + util::unitVectors[i].x;
+            int y = myPos.y + util::unitVectors[i].y;
             Pos p = Pos(x, y);
-            if (x < 0 || x >= X || y < 0 || y >= Y) continue;
+            if (x < 0 || x >= game::X || y < 0 || y >= game::Y) continue;
             if (board[p] == Cell::NEURAL) {
                 next = p;
                 break;
@@ -120,7 +142,7 @@ public:
                 next = p;
             }
         }
-        Controller::printNext(next);
+        controller::printNext(next);
     }
 };
 
@@ -137,7 +159,7 @@ int main(int argc, const char * argv[]) {
         cin >> gameRound; cin.ignore();
         int x, y, remainingTime;
         cin >> x >> y >> remainingTime; cin.ignore();
-        battle.updateSquid(ME, x, y, remainingTime);
+        battle.updateSquid(game::ME, x, y, remainingTime);
         
         battle.board.dump();
         REP(i, enemyNum) {
@@ -146,16 +168,16 @@ int main(int argc, const char * argv[]) {
             battle.updateSquid(i + 1, x, y, remainingTime);
         }
         
-        REP(y, Y) {
+        REP(y, game::Y) {
             string line;
             cin >> line; cin.ignore();
-            REP(x, X) {
+            REP(x, game::X) {
                 battle.board[Pos(x, y)] = line[x];
             }
         }
         battle.turn();
     }
-
+    
     return 0;
 }
 
