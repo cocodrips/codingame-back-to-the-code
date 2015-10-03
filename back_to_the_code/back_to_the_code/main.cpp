@@ -1,5 +1,10 @@
 
+#include <algorithm>
 #include <iostream>
+#include <stack>
+#include <unordered_set>
+#include <vector>
+
 
 using namespace std;
 
@@ -31,7 +36,67 @@ struct Pos {
     bool operator==(const Pos &other) const {
         return x == other.x && y == other.y;
     }
+    
+    Pos operator+(const Pos &other) const {
+        return Pos(x + other.x, y + other.y);
+    }
+    
+    bool operator<(const Pos &other) const {
+        return (x + y) < (other.x + other.y);
+    }
+    
+public:
+    int dist(const Pos &other) const {
+        return abs(x - other.x) + abs(y - other.y);
+    }
+    
+    bool isValid() {
+        return 0 <= x && x < game::X && 0 <= y && y < game::Y;
+    }
+
 };
+
+namespace std
+{
+    template <>
+    struct hash<Pos>
+    {
+        std::size_t operator () ( Pos const & key ) const
+        {
+            return key.x * game::Y + key.y;
+        }
+    };
+}
+
+////////////////////// controller ///////////////////////////
+
+namespace controller {
+    void printNext(const Pos &next) {
+        cout << next.x << " " << next.y << endl;
+    }
+}
+
+
+namespace util {
+const Pos roundVectors[9] = {
+    Pos(1, 1),
+    Pos(1, 0),
+    Pos(1, -1),
+    Pos(-1, 1),
+    Pos(-1, 0),
+    Pos(-1, -1),
+    Pos(0, 1),
+    Pos(0, -1),
+};
+const Pos unitVectors[4] = {
+    Pos(1, 0),
+    Pos(-1, 0),
+    Pos(0, 1),
+    Pos(0, -1),
+};
+}
+
+//////////////////////           ///////////////////////////
 
 class Squid {
 public:
@@ -43,6 +108,7 @@ public:
         pos = Pos(_x, _y);
         remainingTime = _remainingTime;
     }
+
 };
 
 template <typename T>
@@ -66,25 +132,38 @@ public:
         }
     }
     
-};
-
-////////////////////// controller ///////////////////////////
-
-namespace controller {
-    void printNext(Pos &next) {
-        cout << next.x << " " << next.y << endl;
+    int isPainted(const Pos &startPos) {
+        unordered_set<Pos> visited;
+        stack<Pos> cellStack;
+        int colored = 0;
+        visited.insert(startPos);
+        cellStack.push(startPos);
+        return 0;
+        while (!cellStack.empty()) {
+            Pos p = cellStack.top();
+            AREP(i, util::roundVectors) {
+                Pos next = p + util::roundVectors[i];
+                if (visited.find(next) != visited.end()) continue;
+                if (!next.isValid()) return 0;
+                
+                switch ((*this)[next]) {
+                case Cell::NEURAL:
+                    colored++;
+                    cellStack.push(next);
+                    visited.insert(next);
+                case Cell::ME:
+                    break;
+                default:
+                    return 0;
+                    break;
+                }
+            }
+        }
+        return colored;
     }
-}
-
-
-namespace util {
-const Pos unitVectors[4] = {
-    Pos(1, 0),
-    Pos(-1, 0),
-    Pos(0, 1),
-    Pos(0, -1),
 };
-}
+
+
 
 ////////////////////// simulator  ///////////////////////////
 namespace simulator {
@@ -112,6 +191,27 @@ void paint(Board<char> *board, char color, Pos pos) {
 
 
 ////////////////////// ai ///////////////////////////////////
+enum Strategy {
+    CORNER,
+    MAX_RECT,
+};
+
+struct PaintCandidate {
+    int depth;
+    int paintedCell;
+    bool operator<(const PaintCandidate &other) const {
+        if (paintedCell == other.paintedCell) {
+            return depth < other.depth;
+        }
+        return paintedCell < other.paintedCell;
+    }
+    
+    bool operator==(const PaintCandidate &other) const {
+        return  paintedCell == other.paintedCell && depth == other.depth;
+    }
+    
+};
+
 
 class Battle {
 public:
@@ -119,29 +219,105 @@ public:
     Board<char> board;
     Board<bool> visited;
     Squid squids[game::SQUID_NUM_MAX];
+    Strategy strategy = CORNER;
+    Pos *nextDest = nullptr;
 
     
     void updateSquid(int index, int x, int y, int remainingTime) {
         squids[index].update(x, y, remainingTime);
     }
     
-    void turn() {
-        Pos myPos = squids[game::ME].pos;
-        visited[myPos] = true;
-        
-        Pos next = Pos(0, 0);
-        AREP(i, util::unitVectors) {
-            int x = myPos.x + util::unitVectors[i].x;
-            int y = myPos.y + util::unitVectors[i].y;
-            Pos p = Pos(x, y);
-            if (x < 0 || x >= game::X || y < 0 || y >= game::Y) continue;
-            if (board[p] == Cell::NEURAL) {
-                next = p;
-                break;
-            } else if (!visited[myPos]) {
-                next = p;
+    Pos getCorner(Pos currentPos) {
+        int x = currentPos.x < (game::X / 2) ? 0 : game::X - 1;
+        int y = currentPos.y < (game::Y / 2) ? game::Y - 1 : 0;
+        return Pos(x, y);
+    }
+
+    Pos minDistToEnemies(const Pos &myPos) {
+        Pos p = squids[1].pos;
+        int dist = myPos.dist(p);
+        REP (i, enemyNum - 1) {
+            Pos enemy = squids[i + 1].pos;
+            if (p.dist(enemy) < dist) {
+                p = enemy;
+                dist = p.dist(enemy);
             }
         }
+        return p;
+    }
+
+    
+    void largestSpace(Pos prev, Pos pos, Board<char> *board, int depth, int maxDepth, vector<PaintCandidate> *candidates) {
+        if (depth == maxDepth) return;
+        AREP(i, util::unitVectors) {
+            Pos next = pos + util::unitVectors[i];
+            if (next == prev) continue;
+            if ((*board)[next] == Cell::NEURAL) {
+                (*board)[next] = Cell::ME;
+                int result = (*board).isPainted(pos);
+                if (result == 0) {
+                    largestSpace(pos, next, board, depth + 1, maxDepth, candidates);
+                } else {
+                    PaintCandidate candidate;
+                    candidate.depth = depth + 1;
+                    candidate.paintedCell = result;
+                }
+                (*board)[next] = Cell::NEURAL;
+                return;
+            }
+        }
+    }
+    
+    Pos corner(Pos myPos) {
+        if (nextDest == nullptr) {
+            Pos p = getCorner(myPos); //TODO
+            nextDest = new Pos(p.x, p.y);
+        }
+        
+        //
+        if (myPos.y != nextDest -> y) return Pos(myPos.x, nextDest -> y);
+       return *nextDest;
+    }
+    
+    Pos minRect(const Pos myPos) {
+        Pos closest = minDistToEnemies(myPos);
+        int dist = myPos.dist(closest);
+        Pos maxPos = util::unitVectors[0];
+        PaintCandidate maxCandidate;
+        maxCandidate.paintedCell = 0; maxCandidate.depth = 20;
+        AREP(i, util::unitVectors) {
+            vector<PaintCandidate> candidates;
+            largestSpace(myPos, myPos + util::unitVectors[i], &board, 0, max(dist, 6), &candidates);
+            sort(candidates.begin(), candidates.end());
+            if (maxCandidate < candidates[candidates.size() - 1]) {
+                maxCandidate = candidates[candidates.size() - 1];
+                maxPos = util::unitVectors[i];
+            }
+        }
+        return maxPos;
+    }
+    
+    void turn() {
+        Pos myPos = squids[game::ME].pos;
+        Pos next = Pos(0, 0);
+        
+        visited[myPos] = true;
+        
+        if (strategy == CORNER) {
+            next = corner(myPos);
+            if (next == myPos) {
+                // next step;
+                next = Pos(0, 0);
+                strategy = MAX_RECT;
+            }
+
+        }
+        
+        if (strategy == MAX_RECT) {
+            next = Pos(0, 0);//minRect(myPos);
+        }
+        cerr << strategy << endl;
+    
         controller::printNext(next);
     }
 };
@@ -161,7 +337,6 @@ int main(int argc, const char * argv[]) {
         cin >> x >> y >> remainingTime; cin.ignore();
         battle.updateSquid(game::ME, x, y, remainingTime);
         
-        battle.board.dump();
         REP(i, enemyNum) {
             int x, y, remainingTime;
             cin >> x >> y >> remainingTime; cin.ignore();
@@ -175,6 +350,7 @@ int main(int argc, const char * argv[]) {
                 battle.board[Pos(x, y)] = line[x];
             }
         }
+//        battle.board.dump();
         battle.turn();
     }
     
