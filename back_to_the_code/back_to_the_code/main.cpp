@@ -29,7 +29,7 @@ struct Pos {
     int x = 0;
     int y = 0;
     Pos () {
-        Pos(-1, -1);
+        Pos(-100, -100);
     }
     Pos (int _x, int _y) {
         x = _x; y = _y;
@@ -56,7 +56,7 @@ public:
         return 0 <= x && x < game::X && 0 <= y && y < game::Y;
     }
     
-    void dump() {
+    void dump() const {
         cerr << "Pos: (" << x << ", " << y << ")";
     }
 };
@@ -189,20 +189,30 @@ namespace simulator {
 }
 
 
-void paint(Board<char> *board, char color, Pos pos) {
-    int paintCount = 0;
-    REP(i, game::SQUID_NUM_MAX) {
-        if ((*board)[util::unitVectors[i]]) {
-            paintCount++;
+namespace util {
+    Board<int> createTable(const Board<char> &board) {
+        Board<int> table = {};
+        REP(x, game::X) {
+            REP(y, game::Y) {
+                int total = 0;
+                if (x != 0) {
+                    total += table[Pos(x - 1, y)];
+                }
+                if (y != 0) {
+                    total += table[Pos(x, y - 1)];
+                }
+                if (x != 0 && y != 0) {
+                    total -= table[Pos(x - 1, y - 1)];
+                }
+                if (board[Pos(x, y)] == Cell::NEURAL) {
+                    total += 1;
+                }
+                table[Pos(x, y)] = total;
+            }
         }
+        return table;
     }
-    
-    if (paintCount < 2) {
-        return;
-    }
-    
 }
-
 
 
 ////////////////////// ai ///////////////////////////////////
@@ -214,13 +224,8 @@ enum Strategy {
 struct PaintCandidate {
     int depth = 0;
     int paintedCell = 0;
-    vector<Pos> path;
     bool operator<(const PaintCandidate &other) const {
         return ((float)(paintedCell + depth) / depth) < ((float)(other.paintedCell + other.depth) / other.depth);
-//        if (paintedCell == other.paintedCell) {
-//            return depth < other.depth;
-//        }
-//        return paintedCell < other.paintedCell;
     }
     
     bool operator==(const PaintCandidate &other) const {
@@ -235,6 +240,7 @@ public:
     int enemyNum = 0;
     Board<char> board;
     Board<bool> visited;
+    Board<int> table;
     Squid squids[game::SQUID_NUM_MAX];
     Strategy strategy = MAX_RECT;
     Pos *nextDest = nullptr;
@@ -268,6 +274,7 @@ public:
         if (depth == maxDepth) return;
         AREP(i, util::unitVectors) {
             Pos next = pos + util::unitVectors[i];
+            if (!next.isValid()) continue;
             if ((*board)[next] == Cell::NEURAL) {
                 (*board)[next] = Cell::ME;
                 
@@ -287,7 +294,6 @@ public:
                     candidates -> push_back(candidate);
                     cerr << endl;
                     cerr << (float)(paintedSum + depth + 1) / (depth + 1)   << endl;
-//                    board->dump();
                 }
 
                 (*board)[next] = Cell::NEURAL;
@@ -301,34 +307,73 @@ public:
             Pos p = getCorner(myPos); //TODO
             nextDest = new Pos(p.x, p.y);
         }
-        
-        //
+
         if (myPos.y != nextDest -> y) return Pos(myPos.x, nextDest -> y);
        return *nextDest;
     }
     
-//    Pos nearestUnknownCell(const Pos pos) {
-//        
-//    }
+    int getCellScore(const Pos myPos, const Pos &pos) {
+        Pos leftTop = Pos(pos.x - 2, pos.y - 2);
+        Pos rightBottom = Pos(pos.x + 2, pos.y + 2);
+        if (leftTop.x < 0) leftTop.x = 0;
+        if (leftTop.y < 0) leftTop.y = 0;
+        if (rightBottom.x > game::X - 1) rightBottom.x = game::X - 1;
+        if (rightBottom.y > game::Y - 1) rightBottom.y = game::Y - 1;
+        int s = table[rightBottom];
+        if (leftTop.x > 0) {
+            s -= table[Pos(leftTop.x - 1, rightBottom.y)];
+        }
+        if (leftTop.y > 0) {
+            s -= table[Pos(rightBottom.x, leftTop.y - 1)];
+        }
+        if (leftTop.x > 0 && leftTop.y > 0) {
+            s += table[Pos(leftTop.x - 1, leftTop.y - 1)];
+        }
+        return s - myPos.dist(pos);
+    }
+    
+    Pos closestUnknownCell(const Pos pos) {
+        Pos closestCell;
+        int dist = 100000;
+        REP(x, game::X) {
+            REP(y, game::Y) {
+                Pos p = Pos(x, y);
+                if (board[p] != Cell::NEURAL) continue;
+                if (pos.dist(p) < dist) {
+                    dist = pos.dist(p);
+                    closestCell = p;
+                }
+            }
+        }
+        return closestCell;
+    }
     
     Pos unknownCell(const Pos myPos) {
-        Pos p;
+        Pos closest;
+        int bestScore = 0;
+        cerr << "myPos";
+        myPos.dump();
+        cerr << endl;
         AREP(i, util::unitVectors) {
             Pos tmp = myPos + util::unitVectors[i];
             if (!tmp.isValid()) continue;
-            if (p.isValid()) {
-                p = tmp;
-            }
-            
             if (board[tmp] == Cell::NEURAL) {
                 return tmp;
             }
-            
-            if (!visited[tmp]) {
-                return tmp;
+
+            Pos c = closestUnknownCell(tmp);
+            tmp.dump();
+            cerr << " -> closest: ";
+            c.dump();
+            cerr << "(" << c.dist(tmp) << ")" << endl;
+            int score = getCellScore(tmp, c);
+            if (!c.isValid() || bestScore < score) {
+                closest = tmp;
+                bestScore = score;
             }
+
         }
-        return p;
+        return closest;
     }
     
     Pos minRect(const Pos myPos) {
@@ -348,7 +393,7 @@ public:
                 board[next] = Cell::ME;
             }
             vector<Pos> path;
-            largestSpace(myPos + util::unitVectors[i], &board, 0, min(dist, 6), &candidates);
+            largestSpace(myPos + util::unitVectors[i], &board, 0, min(dist, 5), &candidates);
             cerr << "candidates: " << candidates.size() << endl;
             if (candidates.size() > 0) {
                 sort(candidates.begin(), candidates.end());
@@ -370,8 +415,8 @@ public:
     void turn() {
         Pos myPos = squids[game::ME].pos;
         Pos next = Pos(0, 0);
-        
         visited[myPos] = true;
+        table = util::createTable(board);
         
         if (strategy == CORNER) {
             next = corner(myPos);
@@ -484,14 +529,24 @@ void largestSpace2() {
     REP(i, candidates.size()) {
         cerr << candidates[i].paintedCell << "," << candidates[i].depth << endl;
     }
-    
+}
+
+void table() {
+    Board<char> board;
+    board.init(Cell::NEURAL);
+    Battle *battle = new Battle();
+    battle -> table = util::createTable(board);
+    battle -> table.dump();
+    cerr << battle -> getCellScore(Pos(0, 0), Pos(5, 5)) << endl;
     
 }
     
 void runner() {
-    test::isPainted();
-    test::largestSpace();
-    test::largestSpace2();
+//    test::isPainted();
+//    test::largestSpace();
+//    test::largestSpace2();
+    test::table();
+    
 }
 }
 
@@ -509,6 +564,7 @@ int main(int argc, const char * argv[]) {
         int gameRound;
         cin >> gameRound; cin.ignore();
         int x, y, remainingTime;
+        cerr << "Time:" << remainingTime << endl;
         cin >> x >> y >> remainingTime; cin.ignore();
         battle.updateSquid(game::ME, x, y, remainingTime);
         
