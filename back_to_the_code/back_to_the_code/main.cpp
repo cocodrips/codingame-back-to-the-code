@@ -350,7 +350,7 @@ public:
     
     Pos unknownCell(const Pos myPos) {
         Pos closest;
-        int bestScore = 0;
+        int bestScore = -1000;
         cerr << "myPos";
         myPos.dump();
         cerr << endl;
@@ -378,7 +378,7 @@ public:
     
     Pos minRect(const Pos myPos) {
         Pos closest = minDistToEnemies(myPos);
-        int dist = myPos.dist(closest) / 2;
+        int dist = (float)myPos.dist(closest) / 1.5;
         Pos maxPos = unknownCell(myPos);
         cerr << "Default";
         maxPos.dump();
