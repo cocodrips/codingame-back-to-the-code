@@ -1,4 +1,3 @@
-
 #include <algorithm>
 #include <iostream>
 #include <stack>
@@ -8,66 +7,66 @@
 
 using namespace std;
 
-#define REP(i,n) for (int i=0;i<(n);i++)
-#define AREP(i,a) for (int i=0;i<sizeof(a)/sizeof(a[0]);i++)
+#define REP(i, n) for (int i=0;i<(n);i++)
+#define AREP(i, a) for (int i=0;i<sizeof(a)/sizeof(a[0]);i++)
 
 ///////////////////////// base //////////////////////////////
 namespace game {
-const int X = 35;
-const int Y = 20;
-const int SQUID_NUM_MAX = 4;
-const int TURN_MAX = 350;
-const int ME = 0;
+    const int X = 35;
+    const int Y = 20;
+    const int SQUID_NUM_MAX = 4;
+    const int TURN_MAX = 350;
+    const int ME = 0;
 }
 
 namespace Cell {
-const char NEURAL = '.';
-const char ME = '0';
+    const char NEURAL = '.';
+    const char ME = '0';
 }
 
 struct Pos {
     int x = 0;
     int y = 0;
-    Pos () {
+
+    Pos() {
         Pos(-100, -100);
     }
-    Pos (int _x, int _y) {
-        x = _x; y = _y;
+
+    Pos(int _x, int _y) {
+        x = _x;
+        y = _y;
     }
-    
+
     bool operator==(const Pos &other) const {
         return x == other.x && y == other.y;
     }
-    
+
     Pos operator+(const Pos &other) const {
         return Pos(x + other.x, y + other.y);
     }
-    
+
     bool operator<(const Pos &other) const {
         return (x * game::Y + y) < (other.x * game::Y + other.y);
     }
-    
+
 public:
     int dist(const Pos &other) const {
         return abs(x - other.x) + abs(y - other.y);
     }
-    
+
     bool isValid() {
         return 0 <= x && x < game::X && 0 <= y && y < game::Y;
     }
-    
+
     void dump() const {
         cerr << "Pos: (" << x << ", " << y << ")";
     }
 };
 
-namespace std
-{
-    template <>
-    struct hash<Pos>
-    {
-        std::size_t operator () ( Pos const & key ) const
-        {
+namespace std {
+    template<>
+    struct hash<Pos> {
+        std::size_t operator()(Pos const &key) const {
             return key.x * game::Y + key.y;
         }
     };
@@ -83,32 +82,33 @@ namespace controller {
 
 
 namespace util {
-const Pos roundVectors[] = {
-    Pos(1, 1),
-    Pos(1, 0),
-    Pos(1, -1),
-    Pos(-1, 1),
-    Pos(-1, 0),
-    Pos(-1, -1),
-    Pos(0, 1),
-    Pos(0, -1),
-};
-const Pos unitVectors[] = {
-    Pos(1, 0),
-    Pos(-1, 0),
-    Pos(0, 1),
-    Pos(0, -1),
-};
+    const Pos roundVectors[] = {
+            Pos(1, 1),
+            Pos(1, 0),
+            Pos(1, -1),
+            Pos(-1, 1),
+            Pos(-1, 0),
+            Pos(-1, -1),
+            Pos(0, 1),
+            Pos(0, -1),
+    };
+    const Pos unitVectors[] = {
+            Pos(1, 0),
+            Pos(-1, 0),
+            Pos(0, 1),
+            Pos(0, -1),
+    };
 }
 
-//////////////////////           ///////////////////////////
+//////////////////////  Models   ///////////////////////////
 
 class Squid {
 public:
     Pos pos;
     int remainingTime = 0;
-    Squid () {}
-    
+
+    Squid() { }
+
     void update(int _x, int _y, int _remainingTime) {
         pos = Pos(_x, _y);
         remainingTime = _remainingTime;
@@ -116,7 +116,7 @@ public:
 
 };
 
-template <typename T>
+template<typename T>
 struct Board {
 private:
     T _board[game::Y * game::X] = {};
@@ -124,11 +124,11 @@ public:
     T operator[](Pos pos) const {
         return _board[pos.y * game::X + pos.x];
     }
-    
+
     T &operator[](Pos pos) {
         return _board[pos.y * game::X + pos.x];
     }
-    
+
     void dump() {
         REP(y, game::Y) {
             REP(x, game::X) {
@@ -137,7 +137,7 @@ public:
             cerr << endl;
         }
     }
-    
+
     void init(T n) {
         REP(y, game::Y) {
             REP(x, game::X) {
@@ -146,14 +146,14 @@ public:
             cerr << endl;
         }
     }
-    
+
     int isPainted(const Pos &startPos) {
         unordered_set<Pos> visited;
         stack<Pos> cellStack;
         int colored = 1;
         visited.insert(startPos);
         cellStack.push(startPos);
-        
+
         while (!cellStack.empty()) {
             Pos p = cellStack.top();
             cellStack.pop();
@@ -161,16 +161,16 @@ public:
                 Pos next = p + util::roundVectors[i];
                 if (!next.isValid()) return 0;
                 if (visited.find(next) != visited.end()) continue;
-                
+
                 switch ((*this)[next]) {
-                case Cell::NEURAL:
-                    colored++;
-                    cellStack.push(next);
-                    visited.insert(next);
-                case Cell::ME:
-                    continue;
-                default:
-                    return 0;
+                    case Cell::NEURAL:
+                        colored++;
+                        cellStack.push(next);
+                        visited.insert(next);
+                    case Cell::ME:
+                        continue;
+                    default:
+                        return 0;
                 }
             }
         }
@@ -183,7 +183,7 @@ public:
 ////////////////////// simulator  ///////////////////////////
 namespace simulator {
     void nextTurn(Board<char> *board, Pos *nextPositions) {
-    // 重なってた場合は塗らない
+        // 重なってた場合は塗らない
     }
 
 }
@@ -224,14 +224,15 @@ enum Strategy {
 struct PaintCandidate {
     int depth = 0;
     int paintedCell = 0;
+
     bool operator<(const PaintCandidate &other) const {
-        return ((float)(paintedCell + depth) / depth) < ((float)(other.paintedCell + other.depth) / other.depth);
+        return ((float) (paintedCell + depth) / depth) < ((float) (other.paintedCell + other.depth) / other.depth);
     }
-    
+
     bool operator==(const PaintCandidate &other) const {
         return paintedCell == other.paintedCell && depth == other.depth;
     }
-    
+
 };
 
 
@@ -245,11 +246,11 @@ public:
     Strategy strategy = MAX_RECT;
     Pos *nextDest = nullptr;
 
-    
+
     void updateSquid(int index, int x, int y, int remainingTime) {
         squids[index].update(x, y, remainingTime);
     }
-    
+
     Pos getCorner(Pos currentPos) {
         int x = currentPos.x < (game::X / 2) ? 0 : game::X - 1;
         int y = currentPos.y < (game::Y / 2) ? game::Y - 1 : 0;
@@ -269,7 +270,7 @@ public:
         return p;
     }
 
-    
+
     void largestSpace(Pos pos, Board<char> *board, int depth, int maxDepth, vector<PaintCandidate> *candidates) {
         if (depth == maxDepth) return;
         AREP(i, util::unitVectors) {
@@ -277,7 +278,7 @@ public:
             if (!next.isValid()) continue;
             if ((*board)[next] == Cell::NEURAL) {
                 (*board)[next] = Cell::ME;
-                
+
                 int paintedSum = 0;
                 AREP(i, util::unitVectors) {
                     Pos tmp = next + util::unitVectors[i];
@@ -291,9 +292,9 @@ public:
                     PaintCandidate candidate;
                     candidate.depth = depth + 1;
                     candidate.paintedCell = paintedSum;
-                    candidates -> push_back(candidate);
+                    candidates->push_back(candidate);
                     cerr << endl;
-                    cerr << (float)(paintedSum + depth + 1) / (depth + 1)   << endl;
+                    cerr << (float) (paintedSum + depth + 1) / (depth + 1) << endl;
                 }
 
                 (*board)[next] = Cell::NEURAL;
@@ -301,17 +302,17 @@ public:
         }
         return;
     }
-    
+
     Pos corner(Pos myPos) {
         if (nextDest == nullptr) {
             Pos p = getCorner(myPos); //TODO
             nextDest = new Pos(p.x, p.y);
         }
 
-        if (myPos.y != nextDest -> y) return Pos(myPos.x, nextDest -> y);
-       return *nextDest;
+        if (myPos.y != nextDest->y) return Pos(myPos.x, nextDest->y);
+        return *nextDest;
     }
-    
+
     int getCellScore(const Pos myPos, const Pos &pos) {
         Pos leftTop = Pos(pos.x - 2, pos.y - 2);
         Pos rightBottom = Pos(pos.x + 2, pos.y + 2);
@@ -331,7 +332,7 @@ public:
         }
         return s - myPos.dist(pos);
     }
-    
+
     Pos closestUnknownCell(const Pos pos) {
         Pos closestCell;
         int dist = 100000;
@@ -347,7 +348,7 @@ public:
         }
         return closestCell;
     }
-    
+
     Pos unknownCell(const Pos myPos) {
         Pos closest;
         int bestScore = -1000;
@@ -375,15 +376,16 @@ public:
         }
         return closest;
     }
-    
+
     Pos minRect(const Pos myPos) {
         Pos closest = minDistToEnemies(myPos);
-        int dist = (float)myPos.dist(closest) / 1.5;
+        int dist = (float) myPos.dist(closest) / 1.5;
         Pos maxPos = unknownCell(myPos);
         cerr << "Default";
         maxPos.dump();
         PaintCandidate maxCandidate;
-        maxCandidate.paintedCell = 0; maxCandidate.depth = 20;
+        maxCandidate.paintedCell = 0;
+        maxCandidate.depth = 20;
         AREP(i, util::unitVectors) {
             Pos next = myPos + util::unitVectors[i];
             if (visited[next]) continue;
@@ -411,13 +413,13 @@ public:
         }
         return maxPos;
     }
-    
+
     void turn() {
         Pos myPos = squids[game::ME].pos;
         Pos next = Pos(0, 0);
         visited[myPos] = true;
         table = util::createTable(board);
-        
+
         if (strategy == CORNER) {
             next = corner(myPos);
             if (next == myPos) {
@@ -427,156 +429,161 @@ public:
             }
 
         }
-        
+
         if (strategy == MAX_RECT) {
             next = minRect(myPos);
         }
         cerr << "Strategy:" << strategy << endl;
-    
+
         controller::printNext(next);
     }
 };
 
 //////////////////////  test  /////////////////////////////
 namespace test {
-void isPainted() {
-    Board<char> board;
-    board.init(Cell::NEURAL);
-    Pos nineBlock[] = {
-        Pos(0, 0),
-        Pos(0, 1),
-        Pos(0, 2),
-        Pos(0, 3),
-        Pos(1, 3),
-        Pos(2, 3),
-        Pos(3, 3),
-        Pos(3, 2),
-        Pos(3, 1),
-        Pos(3, 0),
-        Pos(2, 0),
-        Pos(1, 0),
-    };
-    AREP(i, nineBlock) {
-        board[nineBlock[i]] = Cell::ME;
-    }
-    cout << "isPainted - 4: " << board.isPainted(Pos(1, 1)) << endl;
-    board[Pos(3,2)] = Cell::NEURAL;
-    cout << "isPainted - 0: " << board.isPainted(Pos(1, 1)) << endl;
+    void isPainted() {
+        Board<char> board;
+        board.init(Cell::NEURAL);
+        Pos nineBlock[] = {
+                Pos(0, 0),
+                Pos(0, 1),
+                Pos(0, 2),
+                Pos(0, 3),
+                Pos(1, 3),
+                Pos(2, 3),
+                Pos(3, 3),
+                Pos(3, 2),
+                Pos(3, 1),
+                Pos(3, 0),
+                Pos(2, 0),
+                Pos(1, 0),
+        };
+        AREP(i, nineBlock) {
+            board[nineBlock[i]] = Cell::ME;
+        }
+        cout << "isPainted - 4: " << board.isPainted(Pos(1, 1)) << endl;
+        board[Pos(3, 2)] = Cell::NEURAL;
+        cout << "isPainted - 0: " << board.isPainted(Pos(1, 1)) << endl;
 
 
-}
-    
-void largestSpace() {
-    Board<char> board;
-    board.init(Cell::NEURAL);
-    Pos nineBlock[] = {
-        Pos(0, 0),
-        Pos(0, 1),
-        Pos(0, 2),
-        Pos(0, 3),
-        Pos(1, 3),
-        Pos(3, 3),
-        Pos(3, 2),
-        Pos(3, 1),
-        Pos(3, 0),
-        Pos(2, 0),
-        Pos(1, 0),
-    };
-    AREP(i, nineBlock) {
-        board[nineBlock[i]] = Cell::ME;
     }
-    
-    Battle *battle = new Battle();
-    vector<PaintCandidate> candidates;
-    battle -> largestSpace(Pos(1, 3), &board, 0, 7, &candidates);
-    cout << "largestSpace - 0: " << candidates.size() << endl;
-    
-    board[Pos(2, 3)] = Cell::ME;
-    vector<PaintCandidate> candidates2;
-    battle -> largestSpace(Pos(3, 3), &board, 0, 6, &candidates2);
-    cout << "largestSpace - 2: " << candidates.size() << endl;
 
-}
-    
-void largestSpace2() {
-    Board<char> board;
-    board.init(Cell::NEURAL);
-    Pos nineBlock[] = {
-        Pos(10, 1),
-        Pos(11, 1),
-        Pos(12, 1),
-        Pos(12, 2),
-        Pos(12, 3),
-        Pos(12, 4),
-        Pos(11, 4),
-        Pos(10, 4),
-        Pos(9, 4),
-        Pos(8, 4),
-        Pos(7, 4),
-        Pos(7, 3),
-        Pos(7, 2),
-        Pos(7, 1),
-    };
-    AREP(i, nineBlock) {
-        board[nineBlock[i]] = Cell::ME;
+    void largestSpace() {
+        Board<char> board;
+        board.init(Cell::NEURAL);
+        Pos nineBlock[] = {
+                Pos(0, 0),
+                Pos(0, 1),
+                Pos(0, 2),
+                Pos(0, 3),
+                Pos(1, 3),
+                Pos(3, 3),
+                Pos(3, 2),
+                Pos(3, 1),
+                Pos(3, 0),
+                Pos(2, 0),
+                Pos(1, 0),
+        };
+        AREP(i, nineBlock) {
+            board[nineBlock[i]] = Cell::ME;
+        }
+
+        Battle *battle = new Battle();
+        vector<PaintCandidate> candidates;
+        battle->largestSpace(Pos(1, 3), &board, 0, 7, &candidates);
+        cout << "largestSpace - 0: " << candidates.size() << endl;
+
+        board[Pos(2, 3)] = Cell::ME;
+        vector<PaintCandidate> candidates2;
+        battle->largestSpace(Pos(3, 3), &board, 0, 6, &candidates2);
+        cout << "largestSpace - 2: " << candidates.size() << endl;
+
     }
-    
-    Battle *battle = new Battle();
-    vector<PaintCandidate> candidates;
-    battle -> largestSpace(Pos(7, 1), &board, 0, 7, &candidates);
-    cout << "largestSpace2 - 0: " << candidates.size() << endl;
+
+    void largestSpace2() {
+        Board<char> board;
+        board.init(Cell::NEURAL);
+        Pos nineBlock[] = {
+                Pos(10, 1),
+                Pos(11, 1),
+                Pos(12, 1),
+                Pos(12, 2),
+                Pos(12, 3),
+                Pos(12, 4),
+                Pos(11, 4),
+                Pos(10, 4),
+                Pos(9, 4),
+                Pos(8, 4),
+                Pos(7, 4),
+                Pos(7, 3),
+                Pos(7, 2),
+                Pos(7, 1),
+        };
+        AREP(i, nineBlock) {
+            board[nineBlock[i]] = Cell::ME;
+        }
+
+        Battle *battle = new Battle();
+        vector<PaintCandidate> candidates;
+        battle->largestSpace(Pos(7, 1), &board, 0, 7, &candidates);
+        cout << "largestSpace2 - 0: " << candidates.size() << endl;
 //    sort(candidates.begin(), candidates.end());
-    REP(i, candidates.size()) {
-        cerr << candidates[i].paintedCell << "," << candidates[i].depth << endl;
+        REP(i, candidates.size()) {
+            cerr << candidates[i].paintedCell << "," << candidates[i].depth << endl;
+        }
     }
-}
 
-void table() {
-    Board<char> board;
-    board.init(Cell::NEURAL);
-    Battle *battle = new Battle();
-    battle -> table = util::createTable(board);
-    battle -> table.dump();
-    cerr << battle -> getCellScore(Pos(0, 0), Pos(5, 5)) << endl;
-    
-}
-    
-void runner() {
+    void table() {
+        Board<char> board;
+        board.init(Cell::NEURAL);
+        Battle *battle = new Battle();
+        battle->table = util::createTable(board);
+        battle->table.dump();
+        cerr << battle->getCellScore(Pos(0, 0), Pos(5, 5)) << endl;
+
+    }
+
+    void runner() {
 //    test::isPainted();
 //    test::largestSpace();
 //    test::largestSpace2();
-    test::table();
-    
-}
+        test::table();
+
+    }
 }
 
 ////////////////////// mainloop ///////////////////////////
 
-int main(int argc, const char * argv[]) {
+int main(int argc, const char *argv[]) {
 //    test::runner(); return 0;
-    
+
     int enemyNum = 0;
-    cin >> enemyNum; cin.ignore();
+    cin >> enemyNum;
+    cin.ignore();
     Battle battle = Battle();
     battle.enemyNum = enemyNum;
-    
+
     while (1) {
         int gameRound;
-        cin >> gameRound; cin.ignore();
+        cin >> gameRound;
+        cin.ignore();
         int x, y, remainingTime;
         cerr << "Time:" << remainingTime << endl;
-        cin >> x >> y >> remainingTime; cin.ignore();
+        cin >> x >> y >> remainingTime;
+        cin.ignore();
         battle.updateSquid(game::ME, x, y, remainingTime);
-        
+
         REP(i, enemyNum) {
             int x, y, remainingTime;
-            cin >> x >> y >> remainingTime; cin.ignore();
+            cin >> x >> y >> remainingTime;
+            cin.ignore();
             battle.updateSquid(i + 1, x, y, remainingTime);
         }
-        
+
         REP(y, game::Y) {
             string line;
-            cin >> line; cin.ignore();
+            cin >> line;
+            cin.ignore();
             REP(x, game::X) {
                 battle.board[Pos(x, y)] = line[x];
             }
@@ -584,41 +591,7 @@ int main(int argc, const char * argv[]) {
 //        battle.board.dump();
         battle.turn();
     }
-    
+
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
